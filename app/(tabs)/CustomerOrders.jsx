@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { auth, db } from '../services/firebase';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { subscribeToOrders } from "../services/helper";
 
 export default function CustomerOrders() {
     const [orders, setOrders] = useState([]);
@@ -13,21 +13,9 @@ export default function CustomerOrders() {
 
     useEffect(() => {
         if (!auth.currentUser) return;
-        const q = query(
-            collection(db, "orders"),
-            where("userId", "==", auth.currentUser.uid),
-            orderBy("createdAt", "desc")
-        );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedOrders = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setOrders(fetchedOrders);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching orders:", error);
+        const unsubscribe = subscribeToOrders(auth.currentUser.uid, (item) => {
+            setOrders(item);
             setLoading(false);
         });
 
@@ -60,8 +48,6 @@ export default function CustomerOrders() {
 
     const renderOrderItem = ({ item }) => {
         const statusColor = getStatusColor(item.status);
-
-        // Create a summary string of items (e.g., "Chicken Biryani x2, Coke x1")
         const itemsSummary = item.items.map(i => `${i.name} x${i.quantity}`).join(', ');
 
         return (

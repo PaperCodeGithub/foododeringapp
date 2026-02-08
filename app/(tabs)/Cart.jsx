@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { auth, db } from '../services/firebase';
 import { collection, onSnapshot, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { subscribeToCart, removeFromCart, placeOrder } from "../services/helper";
 
 export default function Cart() {
     const [cartItems, setCartItems] = useState([]);
@@ -20,17 +21,8 @@ export default function Cart() {
     useEffect(() => {
         if (!auth.currentUser) return;
 
-        const cartRef = collection(db, "users", auth.currentUser.uid, "cart");
-
-        const unsubscribe = onSnapshot(cartRef, (snapshot) => {
-            const items = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+        const unsubscribe = subscribeToCart(auth.currentUser.uid, (items) => {
             setCartItems(items);
-            setLoading(false);
-        }, (error) => {
-            console.error(error);
             setLoading(false);
         });
 
@@ -39,9 +31,9 @@ export default function Cart() {
 
     const deleteItem = async (itemId) => {
         try {
-            await deleteDoc(doc(db, "users", auth.currentUser.uid, "cart", itemId));
+            await removeFromCart(auth.currentUser.uid, itemId);
         } catch (error) {
-            Alert.alert("Error", "Could not remove item.");
+            Alert.alert("Error", "Could not remove item. " + error.getMessage());
         }
     };
 
@@ -50,22 +42,7 @@ export default function Cart() {
         setCheckingOut(true);
 
         try {
-            const batch = writeBatch(db);
-            const orderRef = doc(collection(db, "orders"));
-            batch.set(orderRef, {
-                userId: auth.currentUser.uid,
-                items: cartItems,
-                totalAmount: total,
-                status: "Pending",
-                createdAt: new Date().toISOString()
-            });
-
-            cartItems.forEach(item => {
-                const itemRef = doc(db, "users", auth.currentUser.uid, "cart", item.id);
-                batch.delete(itemRef);
-            });
-
-            await batch.commit();
+            await placeOrder(auth.currentUser.uid, cartItems, total);
 
             Alert.alert("Success", "Order placed successfully!", [
                 { text: "OK", onPress: () => router.push('/CustomerOrders') }

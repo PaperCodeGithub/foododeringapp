@@ -1,4 +1,4 @@
-import { Tabs, useRouter, usePathname } from 'expo-router'; // Import useRouter & usePathname
+import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from "../services/firebase";
 import { useEffect, useState } from "react";
@@ -15,7 +15,7 @@ export default function TabLayout() {
     const [type, setType] = useState("customer");
 
     const router = useRouter();
-    const pathname = usePathname(); // Get current path
+    const pathname = usePathname();
 
     useEffect(() => {
         const unsubscribed = onAuthStateChanged(auth, async (authenticatedUser) => {
@@ -95,6 +95,15 @@ export default function TabLayout() {
                     title: 'Orders',
                     href: type === "customer" ? "/CustomerOrders" : null,
                     tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" size={size} color={color} />,
+                }}
+            />
+
+            <Tabs.Screen
+                name="ViewRestaurants"
+                options={{
+                    title: 'Restaurants',
+                    href: type === "customer" ? "/ViewRestaurants" : null,
+                    tabBarIcon: ({ color, size }) => <Ionicons name="restaurant" size={size} color={color} />,
                 }}
             />
 

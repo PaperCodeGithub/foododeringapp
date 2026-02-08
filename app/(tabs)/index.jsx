@@ -10,10 +10,10 @@ import {
     Image
 } from 'react-native';
 import { auth, db } from '../services/firebase';
-import { collection, query, orderBy, limit, getDocs, startAfter, doc, getDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from "firebase/auth";
+import { getFoods, getUserData } from "../services/helper";
 
 export default function Home() {
 
@@ -34,11 +34,8 @@ export default function Home() {
         const unsubscribed = onAuthStateChanged(auth, async (authenticatedUser) => {
             if (authenticatedUser) {
                 try {
-                    const docRef = doc(db, "users", authenticatedUser.uid);
-                    const docSnap = await getDoc(docRef);
-                    if (docSnap.exists() && docSnap.data().name) {
-                        setUserName(docSnap.data().name);
-                    }
+                    const response = getUserData(authenticatedUser.uid);
+                    setUserName(response.data.name);
                 } catch (error) {
                     console.log("Error fetching user name:", error);
                 }
@@ -48,33 +45,39 @@ export default function Home() {
     }, []);
 
 
+    const loadFoods = async (isLoadMore = false) => {
+        if(isLoadMore && (loadingMore || isListEnd)) return;
+
+        if (isLoadMore)
+            setLoadingMore(true);
+        else
+            setLoading(true);
+
+        try{
+            const response = await getFoods(isLoadMore ? lastVisible : null);
+            if (isLoadMore) {
+                setFoods(prev => [...prev, ...response.data]);
+                setFilteredFoods(prev => [...prev, ...response.data]);
+            } else {
+                setFilteredFoods(response.data);
+                setFoods(response.data);
+            }
+
+            setLastVisible(response.lastDoc);
+            setIsListEnd(response.isListEnded);
+        }catch(error) {
+            console.log(error);
+        }finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    }
+
+
     useEffect(() => {
-        fetchInitialFoods();
+        loadFoods();
     }, []);
 
-    const fetchInitialFoods = async () => {
-        try {
-            const q = query(
-                collection(db, "foods"),
-                orderBy("createdAt", "desc"),
-                limit(20)
-            );
-
-            const documentSnapshots = await getDocs(q);
-            const items = documentSnapshots.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-
-            setFoods(items);
-            setFilteredFoods(items);
-            setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-            setLoading(false);
-        } catch (error) {
-            console.error(error);
-            setLoading(false);
-        }
-    };
 
     const handleSearch = (text) => {
         setSearchQuery(text);
@@ -87,37 +90,6 @@ export default function Home() {
             item.category.toLowerCase().includes(text.toLowerCase())
         );
         setFilteredFoods(filtered);
-    };
-
-    const fetchMoreFoods = async () => {
-        if (loadingMore || isListEnd || searchQuery !== '' || !lastVisible) return;
-
-        setLoadingMore(true);
-        try {
-            const nextQuery = query(
-                collection(db, "foods"),
-                orderBy("createdAt", "desc"),
-                startAfter(lastVisible),
-                limit(10)
-            );
-
-            const documentSnapshots = await getDocs(nextQuery);
-
-            if (documentSnapshots.docs.length > 0) {
-                const nextItems = documentSnapshots.docs.map(doc =>
-                    ({ id: doc.id, ...doc.data() }));
-                setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-                const newFoods = [...foods, ...nextItems];
-                setFoods(newFoods);
-                setFilteredFoods(newFoods);
-            } else {
-                setIsListEnd(true);
-            }
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoadingMore(false);
-        }
     };
 
     const renderFoodItem = ({ item }) => {
@@ -141,7 +113,7 @@ export default function Home() {
                     <Image
                         source={{ uri: imageUrl }}
                         style={styles.foodImage}
-                        resizeMode="cover" // Changed from contentFit to resizeMode for React Native Image
+                        resizeMode="cover"
                     />
                     <View style={styles.overlay}>
                         <Text style={styles.categoryBadge}>{item.category}</Text>
@@ -191,7 +163,7 @@ export default function Home() {
                 data={filteredFoods}
                 keyExtractor={(item) => item.id}
                 renderItem={renderFoodItem}
-                onEndReached={fetchMoreFoods}
+                onEndReached={() => loadFoods(true)}
                 onEndReachedThreshold={0.5}
                 ListFooterComponent={renderFooter}
                 contentContainerStyle={styles.listPadding}

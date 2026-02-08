@@ -7,7 +7,7 @@ import {Router, useRouter} from "expo-router";
 
 export default function LoginScreen() {
     const [isLogin, setIsLogin] = useState(true);
-    const [role, setRole] = useState("customer"); // 'customer' or 'restaurant'
+    const [role, setRole] = useState("customer");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);

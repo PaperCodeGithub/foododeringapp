@@ -11,20 +11,22 @@ import {
 } from 'react-native';
 import { db, auth } from './services/firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { Stack, useRouter } from 'expo-router';
+import {Stack, useLocalSearchParams, useRouter} from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ViewMenu() {
+
     const [menuItems, setMenuItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const router = useRouter();
+    const { id } = useLocalSearchParams();
 
     const fetchMenu = async () => {
         try {
             const q = query(
                 collection(db, "foods"),
-                where("restaurantID", "==", auth.currentUser.uid)
+                where("restaurantID", "==", id || auth.currentUser.uid)
             );
             const querySnapshot = await getDocs(q);
             const items = querySnapshot.docs.map(doc => ({
@@ -42,7 +44,7 @@ export default function ViewMenu() {
 
     useEffect(() => {
         fetchMenu();
-    }, []);
+    }, [fetchMenu, id]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -50,6 +52,7 @@ export default function ViewMenu() {
     };
 
     const handleDelete = (id, name) => {
+        if(!id) return;
         Alert.alert(
             "Delete Item",
             `Are you sure you want to remove ${name}?`,
@@ -74,12 +77,14 @@ export default function ViewMenu() {
                 <Text style={styles.category}>{item.category}</Text>
                 <Text style={styles.price}>₹{item.price}</Text>
             </View>
-            <TouchableOpacity
-                onPress={() => handleDelete(item.id, item.name)}
-                style={styles.deleteBtn}
-            >
-                <Ionicons name="trash-outline" size={22} color="#E23744" />
-            </TouchableOpacity>
+            {!id && (
+                <TouchableOpacity
+                    onPress={() => handleDelete(item.id, item.name)}
+                    style={styles.deleteBtn}
+                >
+                    <Ionicons name="trash-outline" size={22} color="#E23744" />
+                </TouchableOpacity>
+            )}
         </View>
     );
 
@@ -94,7 +99,6 @@ export default function ViewMenu() {
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ title: 'My Menu', headerShadowVisible: false }} />
-
             <FlatList
                 data={menuItems}
                 keyExtractor={(item) => item.id}

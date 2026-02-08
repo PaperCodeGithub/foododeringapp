@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image, Act
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { auth, db } from './services/firebase';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { auth } from './services/firebase';
+import { addToCart } from "./services/helper";
 
 export default function FoodDetails() {
     const { id, name, price, resturantName, imageUrl } = useLocalSearchParams();
@@ -25,35 +25,21 @@ export default function FoodDetails() {
         setLoading(true);
         try {
             const user = auth.currentUser;
-            const cartRef = doc(db, "users", user.uid, "cart", id);
-
-            const docSnap = await getDoc(cartRef);
-
-            if (docSnap.exists()) {
-                const currentQty = docSnap.data().quantity;
-                await updateDoc(cartRef, {
-                    quantity: currentQty + quantity,
-                    totalPrice: (currentQty + quantity) * itemPrice
-                });
-            } else {
-                await setDoc(cartRef, {
-                    id,
-                    name,
-                    price: itemPrice,
-                    quantity,
-                    resturantName,
-                    imageUrl: imageUrl || "",
-                    totalPrice: totalAmount,
-                    addedAt: new Date().toISOString()
-                });
-            }
-
+            const item = {
+                id: id,
+                name: name,
+                price: parseFloat(price),
+                resturantName: resturantName,
+                imageUrl: imageUrl,
+                quantity: quantity
+            };
+            await addToCart(user.uid, item);
             Alert.alert(
-                "Added to Cart 🛒",
+                "Added to Cart",
                 `${name} has been added.`,
                 [
-                    { text: "Continue", onPress: () => router.back() },
-                    { text: "View Cart", onPress: () => router.navigate('/Cart') }
+                    {text: "Continue", onPress: () => router.back()},
+                    {text: "View Cart", onPress: () => router.navigate('/Cart')}
                 ]
             );
         } catch (error) {
@@ -62,7 +48,8 @@ export default function FoodDetails() {
         } finally {
             setLoading(false);
         }
-    };
+    }
+
 
     return (
         <View style={styles.container}>
